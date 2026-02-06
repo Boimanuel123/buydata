@@ -1,0 +1,239 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Agent account model
+model Agent {
+  id            String     @id @default(cuid())
+  email         String     @unique
+  password      String
+  name          String
+  phone         String
+  businessName  String?
+  description   String?
+  logo          String?
+  coverImage    String?
+  
+  // Firebase authentication
+  firebaseUid   String?    @unique
+  
+  // Banking details
+  phoneNumber   String     @default("")
+  bankName      String     @default("")
+  accountNumber String     @default("")
+  accountName   String     @default("")
+  
+  // Agent status flow: PENDING -> ACTIVATED
+  status        AgentStatus  @default(PENDING)
+  activationFee Float       @default(20.0) // GH20
+  
+  // Unique shortened slug for agent shop (e.g., "great-data-17687")
+  slug          String     @unique
+  
+  // Finance & Analytics
+  totalEarned   Float      @default(0)
+  totalWithdrawn Float     @default(0)
+  balance       Float      @default(0)
+  commissionRate Float     @default(0.10) // 10% commission
+  
+  // Relationships
+  orders        Order[]
+  transactions  Transaction[]
+  products      AgentProduct[]
+  payouts       Payout[]
+  
+  // Metadata
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  activatedAt   DateTime?
+}
+
+enum AgentStatus {
+  PENDING
+  ACTIVATED
+  SUSPENDED
+  DELETED
+}
+
+// Products available for agent to sell (from DataMart)
+model AgentProduct {
+  id            String     @id @default(cuid())
+  agentId       String
+  agent         Agent      @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  
+  // Product details
+  productId     String     // DataMart product ID
+  name          String
+  network       String     // TELECEL, YELLO, AT_PREMIUM
+  capacity      String     // 1GB, 5GB, etc.
+  price         Float
+  description   String?
+  image         String?
+  
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  
+  @@unique([agentId, productId])
+  @@index([agentId])
+}
+
+// Customer order
+model Order {
+  id            String     @id @default(cuid())
+  agentId       String
+  agent         Agent      @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  
+  // Customer details
+  customerEmail String
+  customerPhone String
+  
+  // Product details
+  productId     String
+  productName   String
+  network       String
+  capacity      String
+  price         Float
+  
+  // Payment
+  transactionId String?
+  transaction   Transaction? @relation(fields: [transactionId], references: [id])
+  status        OrderStatus  @default(PENDING)
+  
+  // DataMart integration
+  datamartOrderId String?  // Response from DataMart API
+  datamartStatus  String?  // Status from DataMart
+  
+  // Commission
+  commission    Float
+  agentEarning  Float
+  
+  // Metadata
+  createdAt     DateTime   @default(now())
+  completedAt   DateTime?
+  
+  @@index([agentId])
+  @@index([status])
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+// Transaction (payment)
+model Transaction {
+  id            String     @id @default(cuid())
+  agentId       String?
+  agent         Agent?     @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  
+  // Type: ACTIVATION (agent pays GH20) or ORDER (customer pays for data)
+  type          TransactionType
+  
+  // Paystack details
+  reference     String     @unique
+  amount        Float      // In GHS
+  amountKobo    Int        // In kobo (for Paystack API)
+  status        PaymentStatus @default(PENDING)
+  
+  // Paystack response
+  accessCode    String?
+  authorizationUrl String?
+  paystackTransactionId Int?
+  
+  // Order link (if type is ORDER)
+  orderId       String?
+  orders        Order[]
+  
+  // Metadata
+  createdAt     DateTime   @default(now())
+  verifiedAt    DateTime?
+  
+  @@index([reference])
+  @@index([status])
+  @@index([type])
+}
+
+enum TransactionType {
+  ACTIVATION    // Agent pays GH20 to activate account
+  ORDER         // Customer pays for data product
+}
+
+enum PaymentStatus {
+  PENDING
+  INITIALIZED
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+// Payout record
+model Payout {
+  id            String     @id @default(cuid())
+  agentId       String
+  agent         Agent      @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  
+  amount        Float
+  method        String     // "momo_wallet", "bank_transfer", etc.
+  status        PayoutStatus @default(PENDING)
+  reference     String?
+  
+  createdAt     DateTime   @default(now())
+  completedAt   DateTime?
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+// Session for NextAuth
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?  @db.Text
+  access_token       String?  @db.Text
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?  @db.Text
+  session_state      String?
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
