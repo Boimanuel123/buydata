@@ -64,16 +64,36 @@ export async function validateStore(slug: string): Promise<StoreValidation> {
  */
 export async function fetchStoreData(slug: string): Promise<StoreData> {
   try {
-    const response = await axios.get(`${API_BASE}/agents/store/${slug}/data`, {
+    // First, try to fetch from our local Firestore API
+    const response = await fetch(`/api/shops/${slug}`);
+    
+    if (response.ok) {
+      const data = await response.json();
+      if (data.success && data.store) {
+        return {
+          store_slug: data.store.store_slug,
+          agent_id: data.store.agent_id,
+          store_name: data.store.store_name,
+          description: data.store.description,
+          logo: data.store.logo,
+          email: data.store.email,
+          color_theme: data.store.color_theme,
+          products: data.store.products,
+        };
+      }
+    }
+
+    // Fall back to external API if local endpoint fails
+    const externalResponse = await axios.get(`${API_BASE}/agents/store/${slug}/data`, {
       headers: {
         "Content-Type": "application/json",
       },
       timeout: 5000,
     });
 
-    return response.data;
+    return externalResponse.data;
   } catch (error: any) {
-    console.log("API unavailable, checking mock data...");
+    console.log("External API unavailable, checking mock data...");
 
     // Fall back to mock data for local development
     if (USE_MOCK_DATA) {

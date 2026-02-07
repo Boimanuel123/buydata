@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import axios from "axios";
-import { prisma } from "@/lib/prisma";
+import { db, COLLECTIONS } from "@/lib/firestore";
 import { generateReference, convertToKobo } from "@/lib/utils";
+import * as admin from "firebase-admin";
 
 const DEV_MODE = process.env.NEXT_PUBLIC_DEV_MODE === "true";
 
@@ -23,53 +24,67 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find agent by slug
-    const agent = await prisma.agent.findUnique({
-      where: { slug: agentSlug },
-    });
+    console.log("[CHECKOUT] Processing order for agent:", agentSlug);
+    console.log("[CHECKOUT] Product:", product);
 
-    if (!agent || agent.status !== "ACTIVATED") {
+    // Find agent by slug in Firestore
+    const agentQuery = await db
+      .collection(COLLECTIONS.AGENTS)
+      .where("slug", "==", agentSlug)
+      .limit(1)
+      .get();
+
+    if (agentQuery.empty) {
       return NextResponse.json(
-        { error: "Agent not found or not activated" },
+        { error: "Agent not found" },
         { status: 404 }
       );
     }
 
-    // Calculate commission and agent earning
-    const commission = product.price * agent.commissionRate;
-    const agentEarning = product.price - commission;
+    const agentDoc = agentQuery.docs[0];
+    const agent = agentDoc.data();
 
-    // Create order
-    const order = await prisma.order.create({
-      data: {
-        agentId: agent.id,
-        customerEmail: email || "unknown@example.com",
-        customerPhone: phone,
-        productId: product.id,
-        productName: product.name,
-        network: network || product.network || "",
-        capacity: product.capacity || "",
-        price: product.price,
-        commission,
-        agentEarning,
-        status: "PENDING",
-      },
+    if (agent.status !== "ACTIVATED") {
+      return NextResponse.json(
+        { error: "Agent not activated" },
+        { status: 403 }
+      );
+    }
+
+    // Get the price agent set, or use base price if not set
+    const agentPrices = agent.agentPrices || {};
+    const agentPrice = agentPrices[product.id] || product.basePrice || product.price;
+    
+    // Calculate commission: agent price - base price
+    const basePrice = product.basePrice || product.price;
+    const commission = Math.max(0, agentPrice - basePrice);
+
+    console.log("[CHECKOUT] Base price:", basePrice);
+    console.log("[CHECKOUT] Agent price:", agentPrice);
+    console.log("[CHECKOUT] Commission:", commission);
+
+    // Create order in Firestore
+    const orderRef = await db.collection(COLLECTIONS.ORDERS).add({
+      agentId: agentDoc.id,
+      agentSlug: agentSlug,
+      customerEmail: email || "unknown@example.com",
+      customerPhone: phone,
+      productId: product.id,
+      productName: product.name,
+      network: network || product.network || "",
+      capacity: product.capacity || "",
+      basePrice: basePrice,
+      agentPrice: agentPrice,
+      commission: commission,
+      status: "PENDING",
+      createdAt: admin.firestore.Timestamp.now(),
+      updatedAt: admin.firestore.Timestamp.now(),
     });
 
-    const amountKobo = convertToKobo(product.price);
+    const amountKobo = convertToKobo(agentPrice); // Charge agent price to customer
     const reference = generateReference("order");
 
-    // Create transaction
-    const transaction = await prisma.transaction.create({
-      data: {
-        type: "ORDER",
-        reference,
-        amount: product.price,
-        amountKobo,
-        status: "INITIALIZED",
-        orderId: order.id,
-      },
-    });
+    console.log(`[CHECKOUT] Order created: orderId: ${orderRef.id}, Reference: ${reference}`);
 
     // Dev mode: return mock response
     if (DEV_MODE) {
@@ -91,15 +106,15 @@ export async function POST(request: NextRequest) {
           amount: amountKobo,
           reference,
           metadata: {
-            orderId: order.id,
-            agentId: agent.id,
+            orderId: orderRef.id,
+            agentId: agentDoc.id,
             agentSlug,
             customerPhone: phone,
             productName: product.name,
             network: network || product.network,
             type: "ORDER",
           },
-          callback_url: `${process.env.NEXTAUTH_URL}/api/orders/verify`,
+          callback_url: `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/api/orders/verify`,
         },
         {
           headers: {
@@ -111,15 +126,6 @@ export async function POST(request: NextRequest) {
       );
 
       if (paystackResponse.data.status) {
-        await prisma.transaction.update({
-          where: { id: transaction.id },
-          data: {
-            accessCode: paystackResponse.data.data.access_code,
-            authorizationUrl: paystackResponse.data.data.authorization_url,
-            paystackTransactionId: paystackResponse.data.data.reference,
-          },
-        });
-
         return NextResponse.json({
           success: true,
           authorization_url: paystackResponse.data.data.authorization_url,

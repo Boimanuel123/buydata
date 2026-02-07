@@ -27,6 +27,7 @@ interface Agent {
   status: string;
   totalEarned: number;
   totalWithdrawn: number;
+  totalOrders?: number;
   balance: number;
   commissionRate: number;
 }
@@ -36,6 +37,39 @@ function DashboardContent() {
   const [agent, setAgent] = useState<Agent | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [activating, setActivating] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchAgent = async (user: any) => {
+    try {
+      console.log("[Dashboard] Fetching profile for UID:", user.uid);
+      const res = await fetch(`/api/agent/profile?t=${Date.now()}`, {
+        headers: {
+          Authorization: `Bearer ${user.uid}`,
+        },
+      });
+      const data = await res.json();
+      console.log("[Dashboard] Profile response:", data);
+      
+      if (res.ok && data.agent) {
+        setAgent(data.agent);
+      } else {
+        console.error("[Dashboard] Failed to load agent:", data.error);
+      }
+    } catch (err) {
+      console.error("[Dashboard] Fetch error:", err);
+    }
+  };
+
+  const handleRefreshProfile = async () => {
+    setRefreshing(true);
+    const storedUser = localStorage.getItem("authUser");
+    if (storedUser) {
+      const user = JSON.parse(storedUser);
+      await fetchAgent(user);
+    }
+    setRefreshing(false);
+  };
 
   useEffect(() => {
     // Check if user is authenticated and fetch agent
@@ -46,31 +80,13 @@ function DashboardContent() {
     }
 
     const user = JSON.parse(storedUser);
-
-    const fetchAgent = async () => {
-      try {
-        console.log("[Dashboard] Fetching profile for UID:", user.uid);
-        const res = await fetch("/api/agent/profile", {
-          headers: {
-            Authorization: `Bearer ${user.uid}`,
-          },
-        });
-        const data = await res.json();
-        console.log("[Dashboard] Profile response:", data);
-        
-        if (res.ok && data.agent) {
-          setAgent(data.agent);
-        } else {
-          console.error("[Dashboard] Failed to load agent:", data.error);
-        }
-      } catch (err) {
-        console.error("[Dashboard] Fetch error:", err);
-      } finally {
-        setLoading(false);
-      }
+    
+    const initFetch = async () => {
+      await fetchAgent(user);
+      setLoading(false);
     };
 
-    fetchAgent();
+    initFetch();
   }, [router]);
 
   const agentLink = agent ? `buydata.shop/${agent.slug}` : "";
@@ -84,6 +100,51 @@ function DashboardContent() {
   const handleLogout = () => {
     localStorage.removeItem("authUser");
     router.push("/login");
+  };
+
+  const handleActivateNow = async () => {
+    if (!agent) return;
+
+    setActivating(true);
+    try {
+      const storedUser = localStorage.getItem("authUser");
+      if (!storedUser) {
+        router.push("/login");
+        return;
+      }
+
+      const user = JSON.parse(storedUser);
+
+      // Initialize Paystack payment with all user details
+      const response = await fetch("/api/activation/payment-init", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          firebaseUid: user.uid,
+          email: user.email,
+          name: user.displayName || agent.name,
+          businessName: user.businessName || "",
+          phone: user.phone || "",
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert("Failed to initialize payment. Please try again.");
+        setActivating(false);
+        return;
+      }
+
+      // Redirect to Paystack payment page
+      window.location.href = data.authorizationUrl;
+    } catch (error) {
+      console.error("Activation error:", error);
+      alert("An error occurred. Please try again.");
+      setActivating(false);
+    }
   };
 
   if (loading) {
@@ -140,9 +201,30 @@ function DashboardContent() {
             <div className="bg-white rounded-2xl shadow p-6 mb-8 border border-gray-200">
               <h2 className="text-2xl font-bold text-primary mb-4">Your Shop Link</h2>
               <div className="bg-light-purple rounded-xl p-6 border border-indigo-200">
-                <p className="text-sm text-gray-600 mb-4">
-                  Your shop will be available once your account is activated. Complete your activation to start receiving orders.
-                </p>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <p className="text-sm text-gray-600 mb-4">
+                      Your shop will be available once your account is activated. Complete your activation to start receiving orders.
+                    </p>
+                  </div>
+                  <div className="flex gap-3 whitespace-nowrap flex-shrink-0">
+                    <button
+                      onClick={handleActivateNow}
+                      disabled={activating}
+                      className="px-6 py-3 bg-primary text-white rounded-lg hover:shadow-lg transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {activating ? "Processing..." : "Activate Now"}
+                    </button>
+                    <button
+                      onClick={handleRefreshProfile}
+                      disabled={refreshing}
+                      className="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Refresh to check if activation is complete"
+                    >
+                      {refreshing ? "..." : "🔄 Refresh"}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -242,12 +324,29 @@ function DashboardContent() {
         {/* ACTIVE STATUS VIEW */}
         {agent.status === "ACTIVATED" && (
           <>
-            {/* Agent Status Banner */}
-            <div className="bg-green-50 border border-green-200 rounded-xl p-6 mb-8">
-              <p className="text-green-700 font-semibold">✓ Account Activated</p>
-              <p className="text-sm text-green-600">
-                Your shop is live and ready to receive orders
-              </p>
+            {/* Action Buttons */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              <Link
+                href="/dashboard/pricing"
+                className="bg-primary text-white rounded-2xl shadow p-8 border border-primary hover:shadow-lg transition-all text-center"
+              >
+                <div className="text-4xl mb-2">💰</div>
+                <h3 className="text-2xl font-bold mb-2">Set Your Prices</h3>
+                <p className="text-sm text-indigo-100">
+                  Customize prices for packages and earn commission on each sale
+                </p>
+              </Link>
+
+              <Link
+                href="/dashboard/orders"
+                className="bg-white rounded-2xl shadow p-8 border border-gray-200 hover:shadow-lg transition-all text-center"
+              >
+                <div className="text-4xl mb-2">📦</div>
+                <h3 className="text-2xl font-bold text-primary mb-2">View Orders</h3>
+                <p className="text-sm text-gray-600">
+                  Track all customer orders and earnings
+                </p>
+              </Link>
             </div>
 
             {/* Agent Link Section */}
@@ -295,9 +394,9 @@ function DashboardContent() {
                   borderColor: "border-purple-200",
                 },
                 {
-                  label: "Commission Rate",
-                  value: `${(agent.commissionRate * 100).toFixed(0)}%`,
-                  icon: TrendingUp,
+                  label: "Total number of Orders",
+                  value: agent.totalOrders?.toString() || "0",
+                  icon: ShoppingBag,
                   color: "bg-amber-50",
                   borderColor: "border-amber-200",
                 },

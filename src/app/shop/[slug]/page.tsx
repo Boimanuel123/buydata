@@ -88,7 +88,7 @@ export default function StorePage() {
         whatsapp={storeData.whatsapp}
       />
 
-      <main className="max-w-7xl mx-auto px-4 py-12">
+      <main className="max-w-7xl mx-auto px-3 sm:px-4 py-8 sm:py-12">
         <ProductGrid
           products={storeData.products || []}
         />

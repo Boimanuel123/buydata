@@ -56,6 +56,28 @@ model Agent {
   activatedAt   DateTime?
 }
 
+// System-wide data packages available for all agents to sell
+model Package {
+  id            String     @id @default(cuid())
+  name          String     // e.g., "MTN 1GB"
+  network       String     // "MTN", "VODAFONE", "AT_PREMIUM", "TELECEL"
+  capacity      String     // "1", "5", "10" (in GB)
+  basePrice     Float      // Base price from DataMart
+  description   String?    // e.g., "Valid for 30 days"
+  datamartId    String?    // DataMart product ID
+  image         String?    // Product image URL
+  
+  // Status
+  isActive      Boolean    @default(true)
+  
+  // Metadata
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  
+  @@index([network])
+  @@index([isActive])
+}
+
 enum AgentStatus {
   PENDING
   ACTIVATED

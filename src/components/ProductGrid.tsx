@@ -46,10 +46,10 @@ export default function ProductGrid({
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-slate-900 mb-8">
+      <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-6 sm:mb-8">
         Available Data Packages
       </h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 md:gap-6">
         {products.map((product) => (
           <ProductCard
             key={product.id}

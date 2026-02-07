@@ -151,7 +151,7 @@ export default function Register() {
                 name="businessName"
                 value={formData.businessName}
                 onChange={handleChange}
-                placeholder="Great Data Ghana"
+                placeholder="Your business name"
                 required
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"
               />

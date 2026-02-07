@@ -1,6 +1,8 @@
 // prisma/seed.js
 // Run with: npm run prisma:seed
 
+require("dotenv").config({ path: ".env.local" });
+
 const { PrismaClient } = require("@prisma/client");
 const bcrypt = require("bcryptjs");
 
@@ -11,9 +13,57 @@ async function main() {
   await prisma.transaction.deleteMany();
   await prisma.order.deleteMany();
   await prisma.agentProduct.deleteMany();
+  await prisma.package.deleteMany();
   await prisma.agent.deleteMany();
 
   console.log("🗑️  Cleaned existing data");
+
+  // Seed data packages (MTN only)
+  const packages = [
+    {
+      name: "MTN 1GB",
+      network: "MTN",
+      capacity: "1",
+      basePrice: 4.0,
+      description: "1GB valid for 30 days",
+      image: "/images/New-mtn-logo.png",
+    },
+    {
+      name: "MTN 2GB",
+      network: "MTN",
+      capacity: "2",
+      basePrice: 7.5,
+      description: "2GB valid for 30 days",
+      image: "/images/New-mtn-logo.png",
+    },
+    {
+      name: "MTN 5GB",
+      network: "MTN",
+      capacity: "5",
+      basePrice: 15.0,
+      description: "5GB valid for 30 days",
+      image: "/images/New-mtn-logo.png",
+    },
+    {
+      name: "MTN 10GB",
+      network: "MTN",
+      capacity: "10",
+      basePrice: 25.0,
+      description: "10GB valid for 30 days",
+      image: "/images/New-mtn-logo.png",
+    },
+  ];
+
+  console.log("📦 Creating data packages...");
+  for (const pkg of packages) {
+    await prisma.package.create({
+      data: {
+        ...pkg,
+        isActive: true,
+      },
+    });
+  }
+  console.log(`✅ Created ${packages.length} data packages`);
 
   // Create test agent
   const testAgent = await prisma.agent.create({
@@ -36,40 +86,22 @@ async function main() {
 
   console.log("✅ Created test agent:", testAgent.email);
 
-  // Create test products for the agent
+  // Create test products for the agent (MTN only)
   const products = [
-    {
-      agentId: testAgent.id,
-      productId: "telecel-1gb",
-      name: "Vodafone 1GB",
-      network: "TELECEL",
-      capacity: "1",
-      price: 3.5,
-      description: "1GB valid for 30 days",
-    },
-    {
-      agentId: testAgent.id,
-      productId: "telecel-5gb",
-      name: "Vodafone 5GB",
-      network: "TELECEL",
-      capacity: "5",
-      price: 15.0,
-      description: "5GB valid for 30 days",
-    },
     {
       agentId: testAgent.id,
       productId: "mtn-1gb",
       name: "MTN 1GB",
-      network: "YELLO",
+      network: "MTN",
       capacity: "1",
-      price: 3.5,
+      price: 4.0,
       description: "1GB valid for 30 days",
     },
     {
       agentId: testAgent.id,
       productId: "mtn-5gb",
       name: "MTN 5GB",
-      network: "YELLO",
+      network: "MTN",
       capacity: "5",
       price: 15.0,
       description: "5GB valid for 30 days",
@@ -80,7 +112,7 @@ async function main() {
     await prisma.agentProduct.create({ data: product });
   }
 
-  console.log("✅ Created test products");
+  console.log("✅ Created test products (MTN only)");
 
   console.log("\n🎉 Database seeded successfully!");
   console.log("\n📝 Test Credentials:");
