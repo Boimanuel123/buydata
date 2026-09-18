@@ -1,244 +1,57 @@
-# BuyData Shop - Agent Storefront Platform
+# BUYDATA
 
-A secure, headless storefront platform for data reselling agents. Agents receive a unique store slug that links directly to their personalized storefront with their own branding, pricing markups, and direct checkout experience.
+BUYDATA is a public data-bundle storefront. Customers choose a network package, enter the recipient's phone number, pay through Paystack, and receive fulfillment through DataMart.
 
-## System Architecture
+## Customer Flow
 
-**Three-System Integration:**
+1. Open the homepage.
+2. Select MTN, TELECEL, or AT (AirtelTigo).
+3. Choose a package and tap **Buy Now**.
+4. Enter the recipient phone number and optional email.
+5. Complete payment on Paystack.
+6. Paystack redirects to BUYDATA and its signed webhook confirms the order.
+7. DataMart delivers the package to the recipient.
 
-```
-┌─────────────────────────────────────────┐
-│       datasell.store                    │
-│  • Agent registration & management      │
-│  • Product catalog                      │
-│  • Analytics & commission tracking      │
-└──────────────┬────────────────────────┘
-               │ API: GET /agents/{slug}
-               │ API: GET /products
-               ↓
-┌──────────────────────────────────────────┐
-│         buydata.shop (THIS PROJECT)      │
-│  • Agent storefronts                     │
-│  • ONE shared Paystack account           │
-│  • Order routing                         │
-└──────────────┬────────────────────────┘
-               │ POST /agent-checkout
-               ↓
-┌──────────────────────────────────────────┐
-│       datamartgh.shop                    │
-│  • Data delivery fulfillment             │
-│  • Commission calculation                │
-│  • Order webhooks to datasell.store      │
-└──────────────────────────────────────────┘
-```
+No customer login, signup, agent account, reseller dashboard, activation fee, or store slug is required.
 
-## How It Works
+## Development
 
-### Agent Registration
-1. Agent signs up on **datasell.store**
-2. **datasell.store** generates unique `store_slug` (e.g., `great-data-1768715470857`)
-3. Agent can share **buydata.shop/shop/{slug}** with customers
-
-### Customer Purchase Flow
-1. Customer visits **buydata.shop/shop/{agent-slug}**
-2. Views agent branding + products (from **datasell.store**)
-3. Clicks "Buy Now" → enters phone/email
-4. Redirected to Paystack checkout (ONE account)
-5. After payment → **datamartgh.shop** delivers data
-6. **datamartgh.shop** sends webhook to **datasell.store** with order details
-7. Agent sees commission in **datasell.store** dashboard
-
-## Layer 1: Routing Constraint
-- Only accessible via `/shop/:storeSlug`
-- Public homepage returns 404 (no SEO, no direct access)
-- Example: `buydata.shop/shop/great-data-1768715470857`
-
-## Layer 2: Server-Side Validation
-- Store slug validated against **datasell.store** API
-- Backend returns store data only if active
-- Non-existent slugs return error
-
-## Layer 3: Signed Store Token
-- JWT token issued after validation
-- Required for all API requests
-- Short-lived, cannot be forged
-
-## Features
-
-✅ **Multi-tenant Storefronts** - Each agent has isolated space  
-✅ **Agent Branding** - Custom logos, colors, contact info  
-✅ **Dynamic Products** - Pulled from datasell.store catalog  
-✅ **Unified Checkout** - One Paystack account, instant redirects  
-✅ **Order Routing** - Seamless handoff to datamartgh.shop  
-✅ **Beautiful UI** - Tailwind CSS responsive design  
-✅ **Form Validation** - React Hook Form + Zod  
-
-## Tech Stack
-
-- **Framework**: Next.js 15 (App Router)
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS
-- **Form Validation**: React Hook Form + Zod
-- **HTTP**: Axios
-- **Payment**: Paystack
-- **APIs**: datasell.store + datamartgh.shop
-
-## Project Structure
-
-```
-src/
-├── app/
-│   ├── layout.tsx          # Root layout with metadata
-│   ├── globals.css         # Global styles
-│   ├── page.tsx            # 404 page (no public homepage)
-│   └── shop/
-│       └── [slug]/
-│           └── page.tsx    # Agent storefront page
-├── components/
-│   ├── StoreHeader.tsx     # Agent info + branding
-│   ├── ProductGrid.tsx     # Product listing
-│   ├── ProductCard.tsx     # Individual product card
-│   ├── CheckoutModal.tsx   # Checkout form
-│   └── NoStoreError.tsx    # Error page
-└── lib/
-    ├── storeApi.ts         # API integration (datasell.store + datamartgh.shop)
-    └── mockData.ts         # Mock data for local testing
-```
-
-## Setup
-
-### 1. Install Dependencies
+Install dependencies and start the development server:
 
 ```bash
 npm install
-```
-
-### 2. Configure Environment
-
-Create `.env.local`:
-
-```env
-# Agent platform API
-NEXT_PUBLIC_API_BASE=https://api.datasell.store
-
-# Enable mock data for local testing
-NEXT_PUBLIC_USE_MOCK=true
-
-# Paystack public key (shared across all agents)
-NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=your_paystack_public_key
-
-# Environment
-NODE_ENV=development
-```
-
-### 3. Run Development Server
-
-```bash
 npm run dev
 ```
 
-Visit: `http://localhost:3000/shop/great-data-1768715470857`
+Open `http://localhost:3000`.
 
-### 4. Build for Production
+Build for production:
 
 ```bash
 npm run build
 npm start
 ```
 
-## API Integration Points
+## Environment
 
-### datasell.store (Agent Data)
-```
-GET /agents/store/{slug}
-GET /agents/store/{slug}/data
-```
+The server requires Firebase Admin credentials for Firestore order storage, Paystack keys for payment initialization and verification, and DataMart credentials for fulfillment. Keep all secret values in `.env.local` or the deployment provider's environment settings.
 
-### datamartgh.shop (Checkout & Fulfillment)
-```
-POST /agent-checkout          # Initialize Paystack
-POST /verify-payment          # Verify order completion
-```
+Required server values include:
 
-## Mock Data for Testing
+- `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
+- `NEXT_PUBLIC_FIREBASE_CLIENT_EMAIL`
+- `NEXT_PUBLIC_FIREBASE_PRIVATE_KEY`
+- `PAYSTACK_SECRET_KEY`
+- `NEXT_PUBLIC_BASE_URL` or `BASE_URL`
+- `NEXT_PUBLIC_DATAMART_API_BASE`
+- `DATAMART_API_KEY`
 
-Three pre-configured stores available:
+## Public Routes
 
-1. **great-data-1768715470857** - Full store with products
-2. **test-agent-xyz** - Minimal store
-3. **demo-store-2024** - Demo with bundles
-
-Mock data is automatically used when datasell.store API is unavailable.
-
-## Security
-
-✅ **No public homepage** - Prevents unauthorized access  
-✅ **Slug validation** - Every request verified  
-✅ **Token-based auth** - JWT prevents API abuse  
-✅ **Price recalculation** - Backend, not frontend  
-✅ **Agent isolation** - Each agent is sandboxed  
-✅ **No indexing** - X-Robots-Tag headers set  
-
-## Deployment
-
-### Vercel (Recommended)
-```bash
-vercel deploy
-```
-
-### Docker
-```bash
-docker build -t buydata-shop .
-docker run -p 3000:3000 buydata-shop
-```
-
-### Environment Variables
-Set in deployment platform:
-- `NEXT_PUBLIC_API_BASE`
-- `NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY`
-- `NEXT_PUBLIC_USE_MOCK`
-
-## Payment Flow
-
-```
-Customer Visit
-    ↓
-Store Validation (datasell.store)
-    ↓
-Product Selection
-    ↓
-Checkout Form / Phone Entry
-    ↓
-Paystack Payment Redirect
-    ↓
-Payment Processing (Paystack)
-    ↓
-datamartgh.shop Receives Order
-    ↓
-Data Delivered to Recipient
-    ↓
-Webhook → datasell.store (commission recorded)
-    ↓
-Success Confirmation
-```
-
-## Future Enhancements
-
-- [ ] Agent dashboard on datasell.store
-- [ ] Real-time order tracking
-- [ ] Customer receipts via email/SMS
-- [ ] Bulk agent setup
-- [ ] Advanced analytics
-- [ ] Multi-language support
-- [ ] Mobile app
-
-## Support
-
-**Platform Issues** → datasell.store team  
-**Payment Issues** → Paystack support  
-**Fulfillment Issues** → datamartgh.shop team
-
-## License
-
-Proprietary - Data Reselling Platform
-
+- `/` - package catalog and network filters
+- `/order-success` - payment result page
+- `/api/packages` - active package catalog
+- `/api/orders/checkout` - creates an order and initializes Paystack
+- `/api/orders/verify` - handles Paystack redirects and signed webhooks
+- `/api/health` - basic integration configuration status
+- `/api/health/paystack` - Paystack mode and key status

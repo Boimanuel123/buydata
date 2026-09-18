@@ -1,76 +1,17 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper function to check if user is authenticated
-    function isAuth() {
-      return request.auth != null;
-    }
-
-    // Helper function to check if user owns the document
-    function isOwner(uid) {
-      return isAuth() && request.auth.uid == uid;
-    }
-
-    // ============ AGENTS COLLECTION ============
-    match /agents/{agentId} {
-      // Allow create if user is authenticated and creating their own document
-      allow create: if isAuth() && request.auth.uid == agentId && 
-                       request.resource.data.firebaseUid == request.auth.uid;
-      
-      // Allow read if:
-      // 1. User is reading their own document, OR
-      // 2. User is reading a public shop (status == "ACTIVATED")
-      allow read: if isOwner(agentId) || 
-                     resource.data.status == "ACTIVATED";
-      
-      // Allow update if user is updating their own document
-      allow update: if isOwner(agentId);
-      
-      // Allow delete if user is deleting their own document
-      allow delete: if isOwner(agentId);
-
-      // ============ ACTIVITIES SUBCOLLECTION ============
-      match /activities/{activityId} {
-        // Allow create/read/list activities for own agent
-        allow create, read, list: if isOwner(agentId);
-      }
-    }
-
-    // ============ PACKAGES COLLECTION ============
+    // Package reads are public. Writes happen through trusted server code.
     match /packages/{packageId} {
-      // Allow read for everyone (packages are public)
-      allow read, list: if true;
-      
-      // Only allow admins to write (would need custom claims in production)
+      allow read: if true;
       allow write: if false;
     }
 
-    // ============ ORDERS COLLECTION ============
+    // Orders are created and updated only by Firebase Admin on the server.
     match /orders/{orderId} {
-      // Allow create for authenticated users
-      allow create: if isAuth();
-      
-      // Allow read if:
-      // 1. User is the agent who received the order, OR
-      // 2. User is the customer (if tracked)
-      allow read: if isAuth() && (
-        request.auth.uid == resource.data.agentId
-      );
-      
-      // Allow update if user is the agent
-      allow update: if isAuth() && request.auth.uid == resource.data.agentId;
+      allow read, write: if false;
     }
 
-    // ============ TRANSACTIONS COLLECTION ============
-    match /transactions/{transactionId} {
-      // Allow create for authenticated users
-      allow create: if isAuth();
-      
-      // Allow read/update if user is the agent
-      allow read, update: if isAuth() && request.auth.uid == resource.data.agentId;
-    }
-
-    // Deny all other access
     match /{document=**} {
       allow read, write: if false;
     }

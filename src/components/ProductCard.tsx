@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { ShoppingCart } from "lucide-react";
 import CheckoutModal from "./CheckoutModal";
 
@@ -16,12 +17,10 @@ interface Product {
 
 interface ProductCardProps {
   product: Product;
-  agentSlug?: string;
 }
 
 export default function ProductCard({
   product,
-  agentSlug,
 }: ProductCardProps) {
   const [showCheckout, setShowCheckout] = useState(false);
 
@@ -46,11 +45,13 @@ export default function ProductCard({
         <div className="flex min-h-[128px] flex-col">
           {/* Compact package heading */}
           <div className="flex items-center justify-center gap-2 border-b border-slate-100 pb-2 text-center">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md bg-slate-100">
-              <img
+            <div className="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md bg-slate-100">
+              <Image
                 src={networkImage}
                 alt={`${product.network || "MTN"} logo`}
-                className="h-full w-full object-contain"
+                fill
+                sizes="32px"
+                className="object-contain"
               />
             </div>
             <h3 className="truncate text-xs font-bold text-slate-900">
@@ -82,7 +83,6 @@ export default function ProductCard({
       {showCheckout && (
         <CheckoutModal
           product={product}
-          agentSlug={agentSlug}
           onClose={() => setShowCheckout(false)}
         />
       )}

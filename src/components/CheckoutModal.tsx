@@ -27,7 +27,6 @@ interface Product {
 
 interface CheckoutModalProps {
   product: Product;
-  agentSlug?: string;
   onClose: () => void;
 }
 

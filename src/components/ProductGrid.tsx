@@ -13,7 +13,6 @@ interface Product {
 
 interface ProductGridProps {
   products: Product[];
-  agentSlug?: string;
 }
 
 export default function ProductGrid({
