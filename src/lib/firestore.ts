@@ -1,29 +1,33 @@
 import * as admin from "firebase-admin";
 
-// Initialize Firebase Admin with service account credentials
-if (!admin.apps.length) {
-  try {
-    const serviceAccount = {
-      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-      clientEmail: process.env.NEXT_PUBLIC_FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.NEXT_PUBLIC_FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-    };
-
-    console.log("[FIREBASE ADMIN] Initializing with project:", serviceAccount.projectId);
-
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount as any),
-      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-    });
-
-    console.log("[FIREBASE ADMIN] Successfully initialized");
-  } catch (error) {
-    console.error("[FIREBASE ADMIN] Initialization error:", error);
-    throw error;
+function getFirestore() {
+  if (admin.apps.length) {
+    return admin.firestore();
   }
+
+  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.NEXT_PUBLIC_FIREBASE_CLIENT_EMAIL;
+  const privateKey = process.env.NEXT_PUBLIC_FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
+
+  if (!projectId || !clientEmail || !privateKey || projectId === "your_firebase_project_id") {
+    throw new Error("Firebase Admin credentials are not configured");
+  }
+
+  admin.initializeApp({
+    credential: admin.credential.cert({ projectId, clientEmail, privateKey }),
+    projectId,
+  });
+
+  return admin.firestore();
 }
 
-export const db = admin.firestore();
+// Defer credential validation until an API route actually uses Firestore.
+export const db = new Proxy({} as admin.firestore.Firestore, {
+  get(_target, property) {
+    const value = Reflect.get(getFirestore(), property);
+    return typeof value === "function" ? value.bind(getFirestore()) : value;
+  },
+});
 
 // Firestore collection names
 export const COLLECTIONS = {
