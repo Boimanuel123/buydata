@@ -96,8 +96,11 @@ export async function POST(request: NextRequest) {
       }
     } catch (error) {
       console.error("[PAYSTACK ERROR]", error);
+      const paystackMessage = axios.isAxiosError(error)
+        ? error.response?.data?.message
+        : null;
       return NextResponse.json(
-        { error: "Failed to initialize payment" },
+        { error: paystackMessage || "Failed to initialize payment" },
         { status: 500 }
       );
     }
