@@ -30,11 +30,25 @@ function serialize(value: any) {
 
 export async function GET() {
   if (!(await isAdminRequest())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const snapshot = await db.collection(COLLECTIONS.PACKAGES).get();
-  const packages = snapshot.empty
-    ? DEFAULT_PACKAGES
-    : snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-  return NextResponse.json({ packages: packages.map((item: any) => ({ ...item, createdAt: serialize(item.createdAt), updatedAt: serialize(item.updatedAt) })) });
+  try {
+    const snapshot = await db.collection(COLLECTIONS.PACKAGES).get();
+    let packages;
+    if (snapshot.empty) {
+      const batch = db.batch();
+      DEFAULT_PACKAGES.forEach((item) => {
+        const ref = db.collection(COLLECTIONS.PACKAGES).doc(item.id);
+        batch.set(ref, { ...item, isActive: true, createdAt: admin.firestore.Timestamp.now(), updatedAt: admin.firestore.Timestamp.now() });
+      });
+      await batch.commit();
+      packages = DEFAULT_PACKAGES.map((item) => ({ ...item, isActive: true }));
+    } else {
+      packages = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    }
+    return NextResponse.json({ packages: packages.map((item: any) => ({ ...item, createdAt: serialize(item.createdAt), updatedAt: serialize(item.updatedAt) })) });
+  } catch (error) {
+    console.error("[ADMIN PACKAGES ERROR]", error);
+    return NextResponse.json({ packages: DEFAULT_PACKAGES, source: "default (firestore unavailable)" });
+  }
 }
 
 export async function POST(request: NextRequest) {

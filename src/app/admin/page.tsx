@@ -74,7 +74,17 @@ export default function AdminPage() {
     if (response.ok) setPackages((await response.json()).packages || []);
   };
 
-  useEffect(() => { loadOrders(); }, []);
+  useEffect(() => { loadOrders(); loadPackages(); }, []);
+
+  useEffect(() => {
+    if (!loggedIn) return;
+    const refresh = window.setInterval(() => {
+      loadOrders();
+      loadPackages();
+      if (section === "support") loadMessages();
+    }, 15000);
+    return () => window.clearInterval(refresh);
+  }, [loggedIn, section]);
 
   const conversations = useMemo(() => {
     const grouped = new Map<string, Message[]>();
@@ -98,7 +108,7 @@ export default function AdminPage() {
     }
     setLoggedIn(true);
     setPassword("");
-    await loadOrders();
+    await Promise.all([loadOrders(), loadPackages()]);
   };
 
   const chooseSection = (value: string) => {
