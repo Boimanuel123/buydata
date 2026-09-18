@@ -3,101 +3,64 @@ import axios from "axios";
 import { db, COLLECTIONS } from "@/lib/firestore";
 import { generateReference, convertToKobo } from "@/lib/utils";
 import * as admin from "firebase-admin";
-
-const DEV_MODE = process.env.NEXT_PUBLIC_DEV_MODE === "true";
+import { DEFAULT_PACKAGES } from "@/app/api/packages/route";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const {
       product,
-      agentSlug,
       email,
       phone,
       network,
     } = body;
 
-    if (!product || !agentSlug || !phone) {
+    if (!product?.id || !phone) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
       );
     }
 
-    console.log("[CHECKOUT] Processing order for agent:", agentSlug);
-    console.log("[CHECKOUT] Product:", product);
-
-    // Find agent by slug in Firestore
-    const agentQuery = await db
-      .collection(COLLECTIONS.AGENTS)
-      .where("slug", "==", agentSlug)
-      .limit(1)
-      .get();
-
-    if (agentQuery.empty) {
-      return NextResponse.json(
-        { error: "Agent not found" },
-        { status: 404 }
-      );
+    let packageData: any;
+    try {
+      const packageDoc = await db.collection(COLLECTIONS.PACKAGES).doc(product.id).get();
+      packageData = packageDoc.exists && packageDoc.data()?.isActive !== false
+        ? { id: packageDoc.id, ...packageDoc.data() }
+        : DEFAULT_PACKAGES.find((item) => item.id === product.id);
+    } catch (error) {
+      console.error("[CHECKOUT] Package lookup failed, using defaults", error);
+      packageData = DEFAULT_PACKAGES.find((item) => item.id === product.id);
     }
 
-    const agentDoc = agentQuery.docs[0];
-    const agent = agentDoc.data();
-
-    if (agent.status !== "ACTIVATED") {
-      return NextResponse.json(
-        { error: "Agent not activated" },
-        { status: 403 }
-      );
+    if (!packageData) {
+      return NextResponse.json({ error: "Package not found" }, { status: 404 });
     }
 
-    // Get the price agent set, or use base price if not set
-    const agentPrices = agent.agentPrices || {};
-    const agentPrice = agentPrices[product.id] || product.basePrice || product.price;
-    
-    // Calculate commission: agent price - base price
-    const basePrice = product.basePrice || product.price;
-    const commission = Math.max(0, agentPrice - basePrice);
-
-    console.log("[CHECKOUT] Base price:", basePrice);
-    console.log("[CHECKOUT] Agent price:", agentPrice);
-    console.log("[CHECKOUT] Commission:", commission);
+    const price = Number(packageData.basePrice);
+    if (!Number.isFinite(price) || price <= 0) {
+      return NextResponse.json({ error: "Package price is invalid" }, { status: 500 });
+    }
 
     // Create order in Firestore
     const orderRef = await db.collection(COLLECTIONS.ORDERS).add({
-      agentId: agentDoc.id,
-      agentSlug: agentSlug,
       customerEmail: email || "unknown@example.com",
       customerPhone: phone,
-      productId: product.id,
-      productName: product.name,
-      network: network || product.network || "",
-      capacity: product.capacity || "",
-      basePrice: basePrice,
-      agentPrice: agentPrice,
-      commission: commission,
+      productId: packageData.id,
+      productName: packageData.name,
+      network: network || packageData.network || "",
+      capacity: packageData.capacity || "",
+      amount: price,
       status: "PENDING",
       createdAt: admin.firestore.Timestamp.now(),
       updatedAt: admin.firestore.Timestamp.now(),
     });
 
-    const amountKobo = convertToKobo(agentPrice); // Charge agent price to customer
+    const amountKobo = convertToKobo(price);
     const reference = generateReference("order");
 
     console.log(`[CHECKOUT] Order created: orderId: ${orderRef.id}, Reference: ${reference}`);
 
-    // Dev mode: return mock response
-    if (DEV_MODE) {
-      return NextResponse.json({
-        success: true,
-        authorization_url: `/order-success?reference=${reference}&status=completed&agentSlug=${agentSlug}`,
-        access_code: "mock_access_code",
-        reference,
-        _dev_mode: true,
-      });
-    }
-
-    // Production: initialize with Paystack
     try {
       const paystackResponse = await axios.post(
         "https://api.paystack.co/transaction/initialize",
@@ -107,14 +70,12 @@ export async function POST(request: NextRequest) {
           reference,
           metadata: {
             orderId: orderRef.id,
-            agentId: agentDoc.id,
-            agentSlug,
             customerPhone: phone,
-            productName: product.name,
-            network: network || product.network,
+            productName: packageData.name,
+            network: network || packageData.network,
             type: "ORDER",
           },
-          callback_url: `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/api/orders/verify`,
+          callback_url: `${process.env.NEXT_PUBLIC_BASE_URL || process.env.BASE_URL || "http://localhost:3000"}/api/orders/verify`,
         },
         {
           headers: {

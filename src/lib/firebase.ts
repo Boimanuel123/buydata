@@ -17,6 +17,11 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
+console.log("[FIREBASE] Initializing with config:", {
+  projectId: firebaseConfig.projectId,
+  authDomain: firebaseConfig.authDomain,
+});
+
 // Initialize Firebase (check if already initialized)
 const firebaseApp =
   getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
@@ -24,9 +29,11 @@ const firebaseApp =
 // Initialize Auth
 const auth = getAuth(firebaseApp);
 
+console.log("[FIREBASE] Auth initialized, setting persistence...");
+
 // Set persistence to LOCAL
 setPersistence(auth, browserLocalPersistence).catch((error) => {
-  console.error("Failed to set persistence:", error);
+  console.error("[FIREBASE] Failed to set persistence:", error);
 });
 
 // Use auth emulator in development

@@ -4,8 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
-import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
-import { auth } from "@/lib/firebase";
 
 export const dynamic = "force-dynamic";
 
@@ -36,64 +34,48 @@ export default function Register() {
     setLoading(true);
     setError("");
 
-    // Validate passwords match
-    if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match");
-      setLoading(false);
-      return;
-    }
-
-    if (formData.password.length < 8) {
-      setError("Password must be at least 8 characters");
-      setLoading(false);
-      return;
-    }
-
     try {
-      // Create Firebase user
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        formData.email,
-        formData.password
-      );
-
-      const user = userCredential.user;
-
-      // Update profile with display name
-      await updateProfile(user, {
-        displayName: formData.name,
+      // Call backend signup API
+      const response = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          businessName: formData.businessName,
+          password: formData.password,
+          confirmPassword: formData.confirmPassword,
+        }),
       });
 
-      // Store user info in localStorage
-      localStorage.setItem(
-        "authUser",
-        JSON.stringify({
-          uid: user.uid,
-          email: user.email,
-          displayName: formData.name,
-          businessName: formData.businessName,
-          phone: formData.phone,
-        })
-      );
+      const data = await response.json();
 
-      console.log("Registration successful:", user.email);
+      if (!response.ok) {
+        setError(data.error || "Signup failed");
+        setLoading(false);
+        return;
+      }
 
-      // Redirect to dashboard (setup complete)
+      // Signup successful - store token and redirect
+      localStorage.setItem("firebaseToken", data.user.idToken);
+      localStorage.setItem("firebaseUid", data.user.uid);
+      localStorage.setItem("firebaseEmail", data.user.email);
+
+      // Also set cookies for middleware auth protection
+      document.cookie = `firebaseToken=${data.user.idToken}; path=/; max-age=${30 * 24 * 60 * 60}`;
+      document.cookie = `firebaseUid=${data.user.uid}; path=/; max-age=${30 * 24 * 60 * 60}`;
+      document.cookie = `firebaseEmail=${data.user.email}; path=/; max-age=${30 * 24 * 60 * 60}`;
+
+      console.log("Registration successful:", data.user.email);
+
+      // Redirect to dashboard
       router.push("/dashboard?welcome=true");
     } catch (err: any) {
       console.error("Registration error:", err);
-
-      // Handle specific Firebase errors
-      if (err.code === "auth/email-already-in-use") {
-        setError("This email is already registered. Please sign in instead.");
-      } else if (err.code === "auth/weak-password") {
-        setError("Password is too weak. Use at least 8 characters, numbers, and symbols.");
-      } else if (err.code === "auth/invalid-email") {
-        setError("Invalid email address.");
-      } else {
-        setError(err.message || "Registration failed. Please try again.");
-      }
-
+      setError(err.message || "Registration failed. Please try again.");
       setLoading(false);
     }
   };

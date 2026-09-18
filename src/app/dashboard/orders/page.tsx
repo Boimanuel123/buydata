@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { LogOut, ArrowLeft, Clock, CheckCircle, XCircle } from "lucide-react";
+import { useUser } from "@/lib/user-context";
 
 interface Order {
   id: string;
@@ -18,20 +19,21 @@ interface Order {
 
 export default function OrdersPage() {
   const router = useRouter();
+  const { user, loading: userLoading } = useUser();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("authUser");
-    if (!storedUser) {
+    if (userLoading) return;
+
+    if (!user) {
       router.push("/login");
       return;
     }
 
-    // For now, we'll use mock data or fetch from agent profile
-    // In a real scenario, you'd get orders for this specific agent
+    // Fetch orders for the authenticated user
     fetchOrders();
-  }, [router]);
+  }, [user, userLoading, router]);
 
   const fetchOrders = async () => {
     try {
@@ -66,8 +68,9 @@ export default function OrdersPage() {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("authUser");
+  const handleLogout = async () => {
+    // Logout will be handled through the useUser context
+    // Just redirect to login
     router.push("/login");
   };
 

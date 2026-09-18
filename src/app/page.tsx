@@ -1,160 +1,103 @@
-import Link from "next/link";
-import { ArrowRight, Zap, Lock, TrendingUp } from "lucide-react";
+"use client";
+
+import { useEffect, useState } from "react";
+import { CheckCircle2, Loader2, ShieldCheck, Smartphone } from "lucide-react";
+import ProductGrid from "@/components/ProductGrid";
+
+interface Package {
+  id: string;
+  name: string;
+  description?: string;
+  network?: string;
+  capacity?: string;
+  basePrice: number;
+}
 
 export default function Home() {
+  const [packages, setPackages] = useState<Package[]>([]);
+  const [selectedNetwork, setSelectedNetwork] = useState("MTN");
+  const [loading, setLoading] = useState(true);
+
+  const networkTabs = [
+    { label: "MTN", value: "MTN" },
+    { label: "TELECEL", value: "TELECEL" },
+    { label: "AT (AIRTELTIGO)", value: "AT" },
+  ];
+
+  const visiblePackages = packages.filter((item) => {
+    const network = item.network?.toUpperCase() || "";
+    return selectedNetwork === "AT"
+      ? network === "AT" || network === "AT_PREMIUM" || network === "AIRTELTIGO"
+      : network === selectedNetwork;
+  });
+
+  useEffect(() => {
+    fetch("/api/packages")
+      .then((response) => response.json())
+      .then((data) => setPackages(data.packages || []))
+      .catch(() => setPackages([]))
+      .finally(() => setLoading(false));
+  }, []);
+
   return (
-    <div className="min-h-screen bg-white">
-      {/* Navigation */}
-      <nav className="fixed top-0 w-full bg-white/95 backdrop-blur border-b border-gray-200 z-50">
-        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex justify-between items-center">
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <div className="w-9 sm:w-10 h-9 sm:h-10 rounded-lg gradient-primary flex items-center justify-center flex-shrink-0">
-              <span className="text-white font-bold text-sm sm:text-lg">₵</span>
-            </div>
-            <span className="text-lg sm:text-xl font-bold text-primary hidden xs:inline">BuyData</span>
+    <div className="min-h-screen bg-slate-50">
+      <header className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-950 text-lg font-black text-white">B</div>
+            <span className="text-xl font-black tracking-tight text-slate-950">BUYDATA</span>
           </div>
-          <div className="flex gap-2 sm:gap-4 items-center">
-            <Link
-              href="/login"
-              className="px-3 sm:px-6 py-1.5 sm:py-2 text-xs sm:text-base text-primary hover:text-accent transition-colors font-medium"
-            >
-              Sign In
-            </Link>
-            <Link
-              href="/register"
-              className="px-3 sm:px-6 py-1.5 sm:py-2 gradient-primary text-white rounded-lg hover:shadow-lg transition-shadow font-medium text-xs sm:text-base"
-            >
-              Join
-            </Link>
-          </div>
+          <span className="hidden text-sm font-medium text-slate-500 sm:block">Fast data for every network</span>
         </div>
-      </nav>
+      </header>
 
-      {/* Hero Section */}
-      <section className="pt-24 sm:pt-32 pb-16 sm:pb-20 px-3 sm:px-4">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+      <main className="mx-auto max-w-6xl px-3 pb-12 pt-8 sm:px-4 sm:pb-16 sm:pt-16">
+        <section className="mb-9 max-w-2xl sm:mb-12">
+          <p className="mb-3 text-sm font-bold uppercase tracking-[0.2em] text-emerald-600">Instant delivery</p>
+          <h1 className="text-3xl font-black tracking-tight text-slate-950 sm:text-6xl">Choose your data. Send it anywhere.</h1>
+          <p className="mt-4 text-base leading-7 text-slate-600 sm:mt-5 sm:text-lg sm:leading-8">Select a network package, enter the recipient&apos;s number, and pay securely with Paystack.</p>
+        </section>
+
+        <section aria-labelledby="packages-heading">
+          <div className="mb-6 flex items-end justify-between gap-3">
             <div>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold text-primary mb-4 sm:mb-6 leading-tight">
-                Sell Data <span className="text-accent">Effortlessly</span>
-              </h1>
-              <p className="text-base sm:text-lg lg:text-xl text-gray-600 mb-6 sm:mb-8 leading-relaxed">
-                Become a data reseller in minutes. Activate your account, get your unique link, and start earning with BuyData.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-                <Link
-                  href="/register"
-                  className="px-6 sm:px-8 py-3 sm:py-4 gradient-primary text-white rounded-lg hover:shadow-xl transition-all font-semibold flex items-center gap-2 justify-center text-sm sm:text-base"
-                >
-                  Get Started <ArrowRight size={18} className="hidden sm:inline" />
-                </Link>
-                <Link
-                  href="#features"
-                  className="px-6 sm:px-8 py-3 sm:py-4 border-2 border-primary text-primary rounded-lg hover:bg-light-purple transition-all font-semibold text-sm sm:text-base"
-                >
-                  Learn More
-                </Link>
+              <h2 id="packages-heading" className="text-xl font-black text-slate-950 sm:text-2xl">Network packages</h2>
+              <div className="mt-4 flex flex-wrap gap-1.5 sm:gap-2" role="tablist" aria-label="Choose a network">
+                {networkTabs.map((tab) => (
+                  <button
+                    key={tab.value}
+                    type="button"
+                    role="tab"
+                    aria-selected={selectedNetwork === tab.value}
+                    onClick={() => setSelectedNetwork(tab.value)}
+                    className={`rounded-full border px-3 py-2 text-xs font-bold transition-colors sm:px-4 sm:text-sm ${
+                      selectedNetwork === tab.value
+                        ? "border-slate-950 bg-slate-950 text-white"
+                        : "border-slate-300 bg-white text-slate-600 hover:border-slate-950 hover:text-slate-950"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
               </div>
             </div>
-            <div className="relative">
-              <div className="absolute inset-0 gradient-primary rounded-xl sm:rounded-2xl blur-3xl opacity-20"></div>
-              <div className="relative bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl sm:rounded-2xl p-4 sm:p-8 border border-indigo-200">
-                <div className="space-y-3 sm:space-y-4">
-                  <div className="bg-white rounded-lg p-3 sm:p-4 border-l-4 border-primary">
-                    <p className="text-xs sm:text-sm text-gray-600">Agent Link</p>
-                    <p className="font-mono text-xs sm:text-sm text-primary font-bold break-all">buydata.shop/your-unique-link</p>
-                  </div>
-                  <div className="bg-white rounded-lg p-3 sm:p-4">
-                    <p className="text-xs sm:text-sm text-gray-600">Monthly Earnings</p>
-                    <p className="text-xl sm:text-2xl font-bold text-green-600">GH₵ 2,450.50</p>
-                  </div>
-                  <div className="bg-white rounded-lg p-3 sm:p-4">
-                    <p className="text-xs sm:text-sm text-gray-600">Total Orders</p>
-                    <p className="text-xl sm:text-2xl font-bold text-primary">845</p>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <Smartphone className="mb-1 shrink-0 text-emerald-600" aria-hidden="true" />
           </div>
-        </div>
-      </section>
+          {loading ? (
+            <div className="flex items-center justify-center py-20 text-slate-500"><Loader2 className="mr-2 animate-spin" size={20} />Loading packages</div>
+          ) : (
+            <ProductGrid products={visiblePackages.map((item) => ({ ...item, price: item.basePrice }))} />
+          )}
+        </section>
 
-      {/* Features Section */}
-      <section id="features" className="py-16 sm:py-20 px-3 sm:px-4 bg-light-purple">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-center text-primary mb-12 lg:mb-16">
-            Why Choose BuyData?
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
-            {[
-              {
-                icon: Zap,
-                title: "Quick Setup",
-                description: "Register and activate in minutes. Pay just GH₵20 to start selling.",
-              },
-              {
-                icon: TrendingUp,
-                title: "Earn More",
-                description: "set your own prices. Withdraw anytime to your mobile wallet.",
-              },
-              {
-                icon: Lock,
-                title: "Secure & Reliable",
-                description: "Powered by Paystack for secure payments.",
-              },
-            ].map((feature, idx) => {
-              const Icon = feature.icon;
-              return (
-                <div
-                  key={idx}
-                  className="bg-white rounded-lg sm:rounded-xl p-6 sm:p-8 border border-gray-200 hover:border-primary hover:shadow-lg transition-all"
-                >
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-lg gradient-primary flex items-center justify-center mb-4 sm:mb-6">
-                    <Icon className="text-white" size={24} />
-                  </div>
-                  <h3 className="text-lg sm:text-xl font-bold text-primary mb-2 sm:mb-3">
-                    {feature.title}
-                  </h3>
-                  <p className="text-sm sm:text-base text-gray-600 leading-relaxed">
-                    {feature.description}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
+        <section className="mt-10 grid gap-4 border-t border-slate-200 pt-8 text-sm text-slate-600 sm:mt-14 sm:grid-cols-3">
+          <div className="flex items-center gap-3"><ShieldCheck className="text-emerald-600" size={20} />Secure Paystack checkout</div>
+          <div className="flex items-center gap-3"><CheckCircle2 className="text-emerald-600" size={20} />No login or signup</div>
+          <div className="flex items-center gap-3"><Smartphone className="text-emerald-600" size={20} />Delivered to your number</div>
+        </section>
+      </main>
 
-      {/* Price Section */}
-      <section className="py-16 sm:py-20 px-3 sm:px-4">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-primary mb-4 sm:mb-6">Simple Pricing</h2>
-          <p className="text-base sm:text-lg lg:text-xl text-gray-600 mb-10 sm:mb-12">
-            Just one-time activation fee to get started
-          </p>
-          <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-lg sm:rounded-2xl p-6 sm:p-8 border-2 border-primary max-w-sm mx-auto">
-            <h3 className="text-xl sm:text-2xl font-bold text-primary mb-3 sm:mb-4">Activation</h3>
-            <div className="text-4xl sm:text-5xl font-bold text-primary mb-2">GH₵ 20</div>
-            <p className="text-xs sm:text-sm text-gray-600 mb-6 sm:mb-8">One-time payment to activate your account</p>
-            <Link
-              href="/register"
-              className="block w-full px-6 py-3 gradient-primary text-white rounded-lg hover:shadow-lg transition-all font-semibold text-sm sm:text-base"
-            >
-              Activate Now
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="bg-gray-50 border-t border-gray-200 py-8 sm:py-12 px-3 sm:px-4">
-        <div className="max-w-6xl mx-auto text-center text-gray-600 text-xs sm:text-sm">
-          <p>© 2026 BuyData. All rights reserved.</p>
-          <p className="text-xs sm:text-xs mt-2">
-            Secure payments powered by Paystack. Data fulfilled by DataMart.
-          </p>
-        </div>
-      </footer>
+      <footer className="border-t border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500">© 2026 BUYDATA · Secure payments powered by Paystack</footer>
     </div>
   );
 }

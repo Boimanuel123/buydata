@@ -27,13 +27,12 @@ interface Product {
 
 interface CheckoutModalProps {
   product: Product;
-  agentSlug: string;
+  agentSlug?: string;
   onClose: () => void;
 }
 
 export default function CheckoutModal({
   product,
-  agentSlug,
   onClose,
 }: CheckoutModalProps) {
   const [loading, setLoading] = useState(false);
@@ -66,7 +65,6 @@ export default function CheckoutModal({
             network: product.network,
             capacity: product.capacity,
           },
-          agentSlug,
           email: data.email || "",
           phone: data.phone,
           network: product.network || data.network,
@@ -83,7 +81,7 @@ export default function CheckoutModal({
 
       // In dev mode, show success page instead of redirecting
       if (result._dev_mode) {
-        window.location.href = `/order-success?reference=${result.reference}&agentSlug=${agentSlug}`;
+        window.location.href = `/order-success?reference=${result.reference}&status=completed`;
         return;
       }
 
@@ -111,12 +109,12 @@ export default function CheckoutModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-3 sm:p-4">
-      <div className="bg-white rounded-lg sm:rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+      <div className="max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-y-auto rounded-lg bg-white shadow-2xl sm:rounded-2xl">
         {/* Header */}
         <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 flex items-center justify-between gradient-primary">
           <div className="flex items-center gap-2 text-white">
             <ShoppingCart size={18} className="flex-shrink-0" />
-            <h2 className="text-lg sm:text-xl font-bold">Complete Purchase</h2>
+            <h2 className="text-base font-bold sm:text-xl">Complete Purchase</h2>
           </div>
           <button
             onClick={onClose}

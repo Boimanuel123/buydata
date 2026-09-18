@@ -2,7 +2,7 @@
 
 import { Suspense } from "react";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   LogOut,
@@ -13,6 +13,7 @@ import {
   Settings,
   ExternalLink,
 } from "lucide-react";
+import { useUser } from "@/lib/user-context";
 
 export const dynamic = "force-dynamic";
 
@@ -34,60 +35,79 @@ interface Agent {
 
 function DashboardContent() {
   const router = useRouter();
-  const [agent, setAgent] = useState<Agent | null>(null);
-  const [loading, setLoading] = useState(true);
+  const searchParams = useSearchParams();
+  const { user, agent, loading, error, signOut, refreshAgent } = useUser();
   const [copied, setCopied] = useState(false);
   const [activating, setActivating] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [packages, setPackages] = useState<any[]>([]);
+  const [loadingPackages, setLoadingPackages] = useState(true);
 
-  const fetchAgent = async (user: any) => {
-    try {
-      console.log("[Dashboard] Fetching profile for UID:", user.uid);
-      const res = await fetch(`/api/agent/profile?t=${Date.now()}`, {
-        headers: {
-          Authorization: `Bearer ${user.uid}`,
-        },
-      });
-      const data = await res.json();
-      console.log("[Dashboard] Profile response:", data);
-      
-      if (res.ok && data.agent) {
-        setAgent(data.agent);
-      } else {
-        console.error("[Dashboard] Failed to load agent:", data.error);
-      }
-    } catch (err) {
-      console.error("[Dashboard] Fetch error:", err);
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    console.log("[DASHBOARD] Checking auth - loading:", loading, "user exists:", !!user);
+    if (!loading && !user) {
+      console.log("[DASHBOARD] No user and not loading, redirecting to login");
+      router.push("/login");
     }
-  };
+  }, [user, loading, router]);
+
+  // Force refresh profile on mount and when returning from activation
+  useEffect(() => {
+    const refresh = async () => {
+      if (user) {
+        setRefreshing(true);
+        await refreshAgent();
+        setRefreshing(false);
+      }
+    };
+
+    if (searchParams.get("activated") === "true" || searchParams.get("welcome") === "true") {
+      console.log("[DASHBOARD] Activation detected, forcing refresh");
+      refresh();
+    }
+  }, [searchParams, user, refreshAgent]);
+
+  // Auto-refresh profile on page load to get latest status
+  useEffect(() => {
+    const refresh = async () => {
+      if (user) {
+        console.log("[DASHBOARD] Auto-refreshing agent profile on mount");
+        await refreshAgent();
+      }
+    };
+
+    if (user && agent) {
+      refresh();
+    }
+  }, []);
+
+  // Load packages to show pricing info
+  useEffect(() => {
+    const loadPackages = async () => {
+      try {
+        const response = await fetch("/api/packages");
+        const data = await response.json();
+        if (data.packages) {
+          setPackages(data.packages);
+        }
+      } catch (err) {
+        console.error("Error loading packages:", err);
+      } finally {
+        setLoadingPackages(false);
+      }
+    };
+
+    if (agent?.status === "ACTIVATED") {
+      loadPackages();
+    }
+  }, [agent?.status]);
 
   const handleRefreshProfile = async () => {
     setRefreshing(true);
-    const storedUser = localStorage.getItem("authUser");
-    if (storedUser) {
-      const user = JSON.parse(storedUser);
-      await fetchAgent(user);
-    }
+    await refreshAgent();
     setRefreshing(false);
   };
-
-  useEffect(() => {
-    // Check if user is authenticated and fetch agent
-    const storedUser = localStorage.getItem("authUser");
-    if (!storedUser) {
-      router.push("/login");
-      return;
-    }
-
-    const user = JSON.parse(storedUser);
-    
-    const initFetch = async () => {
-      await fetchAgent(user);
-      setLoading(false);
-    };
-
-    initFetch();
-  }, [router]);
 
   const agentLink = agent ? `buydata.shop/${agent.slug}` : "";
 
@@ -97,36 +117,29 @@ function DashboardContent() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("authUser");
+  const handleLogout = async () => {
+    await signOut();
     router.push("/login");
   };
 
   const handleActivateNow = async () => {
-    if (!agent) return;
+    if (!agent || !user) return;
 
     setActivating(true);
     try {
-      const storedUser = localStorage.getItem("authUser");
-      if (!storedUser) {
-        router.push("/login");
-        return;
-      }
-
-      const user = JSON.parse(storedUser);
-
-      // Initialize Paystack payment with all user details
+      // Initialize Paystack payment with user details from context
       const response = await fetch("/api/activation/payment-init", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${user.uid}`,
         },
         body: JSON.stringify({
           firebaseUid: user.uid,
           email: user.email,
-          name: user.displayName || agent.name,
-          businessName: user.businessName || "",
-          phone: user.phone || "",
+          name: agent.name,
+          businessName: agent.businessName || "",
+          phone: agent.phone || "",
         }),
       });
 
@@ -161,11 +174,22 @@ function DashboardContent() {
   if (!agent) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-600 mb-4">Failed to load dashboard</p>
-          <Link href="/" className="text-primary hover:underline">
-            Back to home
-          </Link>
+        <div className="text-center max-w-md">
+          <p className="text-gray-600 mb-4">
+            {error || "Failed to load your profile. Please try again."}
+          </p>
+          <div className="flex gap-3 justify-center">
+            <button
+              onClick={handleRefreshProfile}
+              disabled={refreshing}
+              className="px-6 py-2 bg-primary text-white rounded-lg hover:shadow-lg transition-all disabled:opacity-50 font-semibold"
+            >
+              {refreshing ? "Retrying..." : "Retry"}
+            </button>
+            <Link href="/" className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-all font-semibold">
+              Back to home
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -416,6 +440,67 @@ function DashboardContent() {
                 );
               })}
             </div>
+
+            {/* Pricing Summary Section */}
+            {!loadingPackages && packages.length > 0 && (
+              <div className="bg-white rounded-2xl shadow p-6 mb-8 border border-gray-200">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-bold text-primary">Your Package Pricing</h2>
+                  <Link
+                    href="/dashboard/pricing"
+                    className="flex items-center gap-2 px-4 py-2 bg-light-purple text-primary rounded-lg hover:bg-indigo-200 transition-all font-semibold"
+                  >
+                    <Settings size={18} />
+                    Edit Prices
+                  </Link>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-200">
+                        <th className="text-left py-3 px-4 text-gray-600 font-semibold">Package</th>
+                        <th className="text-right py-3 px-4 text-gray-600 font-semibold">Base Price</th>
+                        <th className="text-right py-3 px-4 text-gray-600 font-semibold">Your Price</th>
+                        <th className="text-right py-3 px-4 text-gray-600 font-semibold">Commission/Sale</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {packages.map((pkg) => {
+                        const agentPrice = agent?.agentPrices?.[pkg.id] || pkg.basePrice;
+                        const commission = agentPrice - pkg.basePrice;
+                        return (
+                          <tr key={pkg.id} className="border-b border-gray-100 hover:bg-gray-50 transition">
+                            <td className="py-4 px-4">
+                              <div>
+                                <p className="font-semibold text-gray-900">{pkg.name}</p>
+                                <p className="text-xs text-gray-500">{pkg.network} • {pkg.capacity}</p>
+                              </div>
+                            </td>
+                            <td className="text-right py-4 px-4 text-gray-700 font-medium">GH₵ {pkg.basePrice.toFixed(2)}</td>
+                            <td className="text-right py-4 px-4">
+                              <span className="font-semibold text-primary">GH₵ {agentPrice.toFixed(2)}</span>
+                            </td>
+                            <td className="text-right py-4 px-4">
+                              <span className={`font-semibold ${commission > 0 ? 'text-green-600' : 'text-gray-500'}`}>
+                                GH₵ {commission.toFixed(2)}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="mt-4 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+                  <p className="text-sm text-gray-700">
+                    <span className="font-semibold">How it works:</span> Your commission is the difference between your set price and the base price. 
+                    Higher prices = higher commissions. Click "Edit Prices" to adjust your pricing strategy.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Profile Section */}
             <div className="bg-white rounded-2xl shadow p-6 mb-8 border border-gray-200">

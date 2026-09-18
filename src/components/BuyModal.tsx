@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { X, Loader } from "lucide-react";
+import { useUser } from "@/lib/user-context";
 
 interface BuyModalProps {
   product: {
@@ -15,6 +16,7 @@ interface BuyModalProps {
 }
 
 export default function BuyModal({ product, agentSlug, onClose }: BuyModalProps) {
+  const { user } = useUser();
   const [recipientNumber, setRecipientNumber] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,14 +40,11 @@ export default function BuyModal({ product, agentSlug, onClose }: BuyModalProps)
     setError(null);
 
     try {
-      // Get user email from localStorage if available
-      const userStr = localStorage.getItem("authUser");
-      const userEmail = userStr ? JSON.parse(userStr).email : undefined;
-
       const response = await fetch("/api/orders/checkout", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(user && { Authorization: `Bearer ${user.uid}` }),
         },
         body: JSON.stringify({
           product: {
@@ -54,7 +53,7 @@ export default function BuyModal({ product, agentSlug, onClose }: BuyModalProps)
             price: product.price,
           },
           agentSlug,
-          email: userEmail || undefined,
+          email: user?.email || undefined,
           phone: recipientNumber.trim(),
         }),
       });

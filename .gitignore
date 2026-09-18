@@ -31,6 +31,11 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
+# Firebase service account (sensitive credentials)
+firebase-service-account.json
+FIRESTORE_SETUP*.md
+FIRESTORE_SETUP*.ps1
+
 # IDE
 .vscode/
 .idea/

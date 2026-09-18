@@ -9,7 +9,6 @@ import { CheckCircle2, Home } from "lucide-react";
 function OrderSuccessContent() {
   const searchParams = useSearchParams();
   const reference = searchParams.get("reference");
-  const agentSlug = searchParams.get("agentSlug");
   const status = searchParams.get("status");
 
   return (
@@ -75,14 +74,12 @@ function OrderSuccessContent() {
           </div>
 
           {/* Action Buttons */}
-          {agentSlug && (
-            <Link
-              href={`/${agentSlug}`}
-              className="block w-full text-center gradient-primary text-white py-4 rounded-lg font-semibold hover:shadow-lg transition-all mb-3"
-            >
-              Buy More Data
-            </Link>
-          )}
+          <Link
+            href="/"
+            className="block w-full text-center gradient-primary text-white py-4 rounded-lg font-semibold hover:shadow-lg transition-all mb-3"
+          >
+            Buy More Data
+          </Link>
 
           <Link
             href="/"

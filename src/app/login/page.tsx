@@ -4,8 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Loader } from "lucide-react";
-import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "@/lib/firebase";
 
 export const dynamic = "force-dynamic";
 
@@ -31,42 +29,41 @@ export default function Login() {
     setError("");
 
     try {
-      // Sign in with Firebase
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
-        formData.email,
-        formData.password
-      );
+      // Call backend login API
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+        }),
+      });
 
-      // Store user in localStorage for session management
-      const user = userCredential.user;
-      localStorage.setItem(
-        "authUser",
-        JSON.stringify({
-          uid: user.uid,
-          email: user.email,
-          displayName: user.displayName,
-        })
-      );
+      const data = await response.json();
 
-      console.log("Login successful:", user.email);
+      if (!response.ok) {
+        setError(data.error || "Login failed");
+        setLoading(false);
+        return;
+      }
+
+      // Login successful - store token and redirect
+      localStorage.setItem("firebaseToken", data.user.idToken);
+      localStorage.setItem("firebaseUid", data.user.uid);
+      localStorage.setItem("firebaseEmail", data.user.email);
       
-      // Redirect to dashboard
+      // Also set cookies for middleware auth protection
+      document.cookie = `firebaseToken=${data.user.idToken}; path=/; max-age=${30 * 24 * 60 * 60}`;
+      document.cookie = `firebaseUid=${data.user.uid}; path=/; max-age=${30 * 24 * 60 * 60}`;
+      document.cookie = `firebaseEmail=${data.user.email}; path=/; max-age=${30 * 24 * 60 * 60}`;
+      
+      console.log("Login successful:", data.user.email);
       router.push("/dashboard");
     } catch (err: any) {
       console.error("Login error:", err);
-      
-      // Handle specific Firebase errors
-      if (err.code === "auth/user-not-found") {
-        setError("No account found with this email. Please sign up first.");
-      } else if (err.code === "auth/wrong-password") {
-        setError("Incorrect password. Please try again.");
-      } else if (err.code === "auth/invalid-email") {
-        setError("Invalid email address.");
-      } else {
-        setError(err.message || "Login failed. Please try again.");
-      }
-      
+      setError(err.message || "Login failed. Please try again.");
       setLoading(false);
     }
   };

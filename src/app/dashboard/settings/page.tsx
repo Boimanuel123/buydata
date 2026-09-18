@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Save } from "lucide-react";
+import { useUser } from "@/lib/user-context";
 
 export const dynamic = "force-dynamic";
 
@@ -24,8 +25,8 @@ interface Agent {
 
 export default function Settings() {
   const router = useRouter();
-  const [agent, setAgent] = useState<Agent | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, agent, loading: userLoading, refreshAgent } = useUser();
+  const [loading, setLoading] = useState(userLoading);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -37,48 +38,25 @@ export default function Settings() {
   });
 
   useEffect(() => {
-    // Check if user is authenticated and fetch agent
-    const storedUser = localStorage.getItem("authUser");
-    if (!storedUser) {
+    if (userLoading) {
+      setLoading(true);
+      return;
+    }
+
+    if (!user) {
       router.push("/login");
       return;
     }
 
-    const user = JSON.parse(storedUser);
-
-    const fetchAgent = async () => {
-      try {
-        console.log("[Settings] Fetching profile for UID:", user.uid);
-        const res = await fetch(`/api/agent/profile?t=${Date.now()}`, {
-          headers: {
-            Authorization: `Bearer ${user.uid}`,
-          },
-        });
-        const data = await res.json();
-        console.log("[Settings] Profile response:", data);
-
-        if (res.ok && data.agent) {
-          setAgent(data.agent);
-          setFormData({
-            businessName: data.agent.businessName || "",
-            phone: data.agent.phone || "",
-            description: data.agent.description || "",
-          });
-          setLoading(false);
-        } else {
-          console.error("[Settings] Failed to load agent:", data.error);
-          setError("Failed to load profile");
-          setLoading(false);
-        }
-      } catch (err) {
-        console.error("[Settings] Fetch error:", err);
-        setError("Failed to load profile");
-        setLoading(false);
-      }
-    };
-
-    fetchAgent();
-  }, [router]);
+    if (agent) {
+      setFormData({
+        businessName: agent.businessName || "",
+        phone: agent.phone || "",
+        description: agent.description || "",
+      });
+      setLoading(false);
+    }
+  }, [user, agent, userLoading, router]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -95,15 +73,12 @@ export default function Settings() {
     setError("");
     setSuccess(false);
 
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+
     try {
-      const storedUser = localStorage.getItem("authUser");
-      if (!storedUser) {
-        router.push("/login");
-        return;
-      }
-
-      const user = JSON.parse(storedUser);
-
       const response = await fetch("/api/agent/profile", {
         method: "PUT",
         headers: {

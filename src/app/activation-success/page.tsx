@@ -32,6 +32,7 @@ function ActivationSuccessContent() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
           },
           body: JSON.stringify({
             reference: reference,
@@ -54,6 +55,7 @@ function ActivationSuccessContent() {
         const res = await fetch("/api/agent/profile", {
           headers: {
             Authorization: `Bearer ${verifyData.agent.id}`,
+            "ngrok-skip-browser-warning": "true",
           },
         });
 
@@ -152,7 +154,7 @@ function ActivationSuccessContent() {
 
               {/* Action Buttons */}
               <Link
-                href="/dashboard"
+                href="/dashboard?activated=true"
                 className="block w-full gradient-primary text-white py-4 rounded-lg font-semibold hover:shadow-lg transition-all text-center mb-3"
               >
                 Go to Dashboard

@@ -18,7 +18,6 @@ interface ProductGridProps {
 
 export default function ProductGrid({
   products,
-  agentSlug = "",
 }: ProductGridProps) {
   if (!products || products.length === 0) {
     return (
@@ -47,14 +46,13 @@ export default function ProductGrid({
   return (
     <div>
       <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-6 sm:mb-8">
-        Available Data Packages
+        Select Data Package
       </h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 md:gap-6">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3 md:grid-cols-6 lg:grid-cols-8">
         {products.map((product) => (
           <ProductCard
             key={product.id}
             product={product}
-            agentSlug={agentSlug}
           />
         ))}
       </div>

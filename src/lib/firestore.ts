@@ -1,14 +1,25 @@
 import * as admin from "firebase-admin";
 
-// Initialize Firebase Admin
+// Initialize Firebase Admin with service account credentials
 if (!admin.apps.length) {
   try {
-    admin.initializeApp({
+    const serviceAccount = {
       projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-      // Uses GOOGLE_APPLICATION_CREDENTIALS environment variable or default credentials
+      clientEmail: process.env.NEXT_PUBLIC_FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.NEXT_PUBLIC_FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+    };
+
+    console.log("[FIREBASE ADMIN] Initializing with project:", serviceAccount.projectId);
+
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount as any),
+      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
     });
+
+    console.log("[FIREBASE ADMIN] Successfully initialized");
   } catch (error) {
-    console.error("Firebase Admin initialization error:", error);
+    console.error("[FIREBASE ADMIN] Initialization error:", error);
+    throw error;
   }
 }
 

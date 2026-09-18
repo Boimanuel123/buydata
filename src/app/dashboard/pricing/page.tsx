@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Save } from "lucide-react";
+import { useUser } from "@/lib/user-context";
 
 export const dynamic = "force-dynamic";
 
@@ -19,25 +20,29 @@ interface Package {
 
 export default function Pricing() {
   const router = useRouter();
+  const { user, agent, loading: userLoading } = useUser();
   const [packages, setPackages] = useState<Package[]>([]);
   const [agentPrices, setAgentPrices] = useState<Record<string, number>>({});
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(userLoading);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("authUser");
-    if (!storedUser) {
+    if (userLoading) {
+      setLoading(true);
+      return;
+    }
+
+    if (!user) {
       router.push("/login");
       return;
     }
 
-    const user = JSON.parse(storedUser);
-    fetchData(user);
-  }, [router]);
+    fetchData();
+  }, [user, userLoading, router]);
 
-  const fetchData = async (user: any) => {
+  const fetchData = async () => {
     try {
       // Fetch packages
       const packagesRes = await fetch("/api/packages");
@@ -47,20 +52,11 @@ export default function Pricing() {
         setPackages(packagesData.packages);
       }
 
-      // Fetch agent profile to get current prices
-      const profileRes = await fetch(`/api/agent/profile?t=${Date.now()}`, {
-        headers: {
-          Authorization: `Bearer ${user.uid}`,
-        },
-      });
-
-      const profileData = profileRes.json();
-      profileData.then((data: any) => {
-        if (profileRes.ok && data.agent?.agentPrices) {
-          setAgentPrices(data.agent.agentPrices || {});
-        }
-        setLoading(false);
-      });
+      // Use agent data from context
+      if (agent?.agentPrices) {
+        setAgentPrices(agent.agentPrices);
+      }
+      setLoading(false);
     } catch (err) {
       console.error("[Pricing] Fetch error:", err);
       setError("Failed to load pricing data");
@@ -82,15 +78,12 @@ export default function Pricing() {
     setError("");
     setSuccess(false);
 
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+
     try {
-      const storedUser = localStorage.getItem("authUser");
-      if (!storedUser) {
-        router.push("/login");
-        return;
-      }
-
-      const user = JSON.parse(storedUser);
-
       const response = await fetch("/api/agent/pricing", {
         method: "PUT",
         headers: {
