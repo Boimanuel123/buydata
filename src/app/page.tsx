@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle2, Loader2, ShieldCheck, Smartphone } from "lucide-react";
+import { CheckCircle2, Loader2, Menu, ShieldCheck, Smartphone, X } from "lucide-react";
 import ProductGrid from "@/components/ProductGrid";
 import SupportChat from "@/components/SupportChat";
 
@@ -18,6 +18,7 @@ export default function Home() {
   const [packages, setPackages] = useState<Package[]>([]);
   const [selectedNetwork, setSelectedNetwork] = useState("MTN");
   const [loading, setLoading] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const networkTabs = [
     { label: "MTN", value: "MTN" },
@@ -31,6 +32,17 @@ export default function Home() {
       ? network === "AT" || network === "AT_PREMIUM" || network === "AIRTELTIGO"
       : network === selectedNetwork;
   });
+
+  const chooseNetwork = (network: string) => {
+    setSelectedNetwork(network);
+    setMenuOpen(false);
+    document.getElementById("packages-heading")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const openSupport = () => {
+    setMenuOpen(false);
+    window.dispatchEvent(new Event("buydata:open-support"));
+  };
 
   useEffect(() => {
     fetch("/api/packages")
@@ -48,7 +60,20 @@ export default function Home() {
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-950 text-lg font-black text-white">B</div>
             <span className="text-xl font-black tracking-tight text-slate-950">BUYDATA</span>
           </div>
-          <span className="hidden text-sm font-medium text-slate-500 sm:block">Fast data for every network</span>
+          <div className="relative">
+            <button type="button" aria-label="Open navigation menu" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)} className="rounded-lg border border-slate-200 p-2 text-slate-700 transition hover:bg-slate-100">
+              {menuOpen ? <X size={22} /> : <Menu size={22} />}
+            </button>
+            {menuOpen && (
+              <div className="absolute right-0 top-12 z-30 w-52 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
+                <p className="px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-400">Packages</p>
+                <button type="button" onClick={() => chooseNetwork("MTN")} className="block w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-100">MTN</button>
+                <button type="button" onClick={() => chooseNetwork("TELECEL")} className="block w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-100">TELECEL</button>
+                <button type="button" onClick={() => chooseNetwork("AT")} className="block w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-100">AT (AIRTELTIGO)</button>
+                <button type="button" onClick={openSupport} className="mt-2 block w-full border-t border-slate-100 px-3 py-3 text-left text-sm font-semibold text-emerald-700">Support</button>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 

@@ -50,13 +50,18 @@ export default function AdminPage() {
   const [packageForm, setPackageForm] = useState({ name: "", network: "MTN", capacity: "", basePrice: "", description: "", isActive: true });
 
   const loadOrders = async () => {
-    const response = await fetch("/api/admin/orders");
-    if (!response.ok) {
-      setLoggedIn(false);
-      return;
+    try {
+      const response = await fetch("/api/admin/orders");
+      if (response.status === 401) {
+        setLoggedIn(false);
+        return;
+      }
+      if (!response.ok) throw new Error("Orders could not be loaded");
+      setOrders((await response.json()).orders || []);
+    } catch (loadError) {
+      console.error(loadError);
+      setError("Signed in, but orders could not be loaded. Check your Firebase settings.");
     }
-    setOrders((await response.json()).orders || []);
-    setLoggedIn(true);
   };
 
   const loadMessages = async () => {
@@ -91,6 +96,7 @@ export default function AdminPage() {
       setError("Invalid admin credentials");
       return;
     }
+    setLoggedIn(true);
     setPassword("");
     await loadOrders();
   };

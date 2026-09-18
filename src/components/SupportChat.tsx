@@ -18,6 +18,12 @@ export default function SupportChat() {
   }, []);
 
   useEffect(() => {
+    const openSupport = () => setOpen(true);
+    window.addEventListener("buydata:open-support", openSupport);
+    return () => window.removeEventListener("buydata:open-support", openSupport);
+  }, []);
+
+  useEffect(() => {
     if (!open || !conversationId) return;
     fetch(`/api/support?conversationId=${encodeURIComponent(conversationId)}`).then((response) => response.json()).then((data) => setMessages(data.messages || []));
   }, [open, conversationId]);

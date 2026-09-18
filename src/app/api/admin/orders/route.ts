@@ -9,12 +9,17 @@ function serialize(value: any) {
 
 export async function GET() {
   if (!(await isAdminRequest())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const snapshot = await db.collection(COLLECTIONS.ORDERS).orderBy("createdAt", "desc").limit(200).get();
-  const orders = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })).map((order: any) => ({
-    ...order,
-    createdAt: serialize(order.createdAt),
-    updatedAt: serialize(order.updatedAt),
-    paidAt: serialize(order.paidAt),
-  }));
-  return NextResponse.json({ orders });
+  try {
+    const snapshot = await db.collection(COLLECTIONS.ORDERS).orderBy("createdAt", "desc").limit(200).get();
+    const orders = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })).map((order: any) => ({
+      ...order,
+      createdAt: serialize(order.createdAt),
+      updatedAt: serialize(order.updatedAt),
+      paidAt: serialize(order.paidAt),
+    }));
+    return NextResponse.json({ orders });
+  } catch (error) {
+    console.error("[ADMIN ORDERS ERROR]", error);
+    return NextResponse.json({ error: "Orders are unavailable" }, { status: 503 });
+  }
 }
