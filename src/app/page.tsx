@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, Loader2, ShieldCheck, Smartphone } from "lucide-react";
 import ProductGrid from "@/components/ProductGrid";
+import SupportChat from "@/components/SupportChat";
 
 interface Package {
   id: string;
@@ -98,6 +99,7 @@ export default function Home() {
       </main>
 
       <footer className="border-t border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500">© 2026 BUYDATA · Secure payments powered by Paystack</footer>
+      <SupportChat />
     </div>
   );
 }

@@ -33,6 +33,7 @@ export const db = new Proxy({} as admin.firestore.Firestore, {
 export const COLLECTIONS = {
   PACKAGES: "packages",
   ORDERS: "orders",
+  SUPPORT_MESSAGES: "supportMessages",
 };
 
 // Package document type
